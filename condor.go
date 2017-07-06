@@ -143,16 +143,20 @@ func (cl *CondorLauncher) launch(s *model.Job, condorPath, condorConfig string) 
 	if path.Base(sdir) != "logs" {
 		sdir = path.Join(sdir, "logs")
 	}
+
 	err := os.MkdirAll(sdir, 0755)
 	if err != nil {
 		return "", errors.Wrapf(err, "failed to create the directory %s", sdir)
 	}
+
 	childToken, err := cl.storeConfig(s)
 	if err != nil {
 		return "", err
 	}
+
 	cfgCopy := CopyConfig(cl.cfg)
 	cfgCopy.Set("vault.child_token.token", childToken)
+
 	subfiles := []struct {
 		filename    string
 		filecontent []byte
@@ -185,6 +189,7 @@ func (cl *CondorLauncher) launch(s *model.Job, condorPath, condorConfig string) 
 
 	for _, sf := range subfiles {
 		var fileContent *bytes.Buffer
+
 		if !sf.skipTmpl {
 			fileContent, err = GenerateFile(sf.template, sf.data)
 			if err != nil {
@@ -192,17 +197,20 @@ func (cl *CondorLauncher) launch(s *model.Job, condorPath, condorConfig string) 
 			}
 			sf.filecontent = fileContent.Bytes()
 		}
+
 		if sf.jsonify {
 			sf.filecontent, err = json.Marshal(sf.data)
 			if err != nil {
 				return "", nil
 			}
 		}
+
 		err = ioutil.WriteFile(sf.filename, sf.filecontent, sf.permissions)
 		if err != nil {
 			return "", errors.Wrapf(err, "failed to write to file %s", sf.filename)
 		}
 	}
+
 	submissionPath := subfiles[0].filename
 	cmd := exec.Command(cl.condorSubmit, submissionPath)
 	cmd.Dir = path.Dir(submissionPath)
@@ -210,13 +218,16 @@ func (cl *CondorLauncher) launch(s *model.Job, condorPath, condorConfig string) 
 		fmt.Sprintf("PATH=%s", condorPath),
 		fmt.Sprintf("CONDOR_CONFIG=%s", condorConfig),
 	}
+
 	output, err := cmd.CombinedOutput()
 	log.Infof("Output of condor_submit:\n%s\n", output)
 	if err != nil {
 		return "", errors.Wrapf(err, "failed to execute %s", cl.condorSubmit)
 	}
+
 	id := string(model.ExtractJobID(output))
 	log.Infof("Condor job id is %s\n", id)
+
 	return id, err
 }
 
@@ -444,9 +455,27 @@ func main() {
 
 	launcher := New(cfg, client, &osys{}, csPath, crPath)
 
+	tlsMount := cfg.GetString("vault.tls.mount")
+	if tlsMount == "" {
+		tlsMount = "intermediate-ca"
+	}
+
+	tlsRole := cfg.GetString("vault.tls.role")
+	if tlsRole == "" {
+		tlsRole = "tls-role"
+	}
+
+	tlsCommonName := cfg.GetString("vault.tls.common-name")
+	if tlsCommonName == "" {
+		log.Fatal("vault.tls.common-name must be set in the config file.")
+	}
+
 	launcher.v, err = VaultInit(
 		cfg.GetString("vault.token"),
 		cfg.GetString("vault.url"),
+		tlsMount,
+		tlsRole,
+		tlsCommonName,
 	)
 	if err != nil {
 		log.Fatalf("%+v\n", err)
