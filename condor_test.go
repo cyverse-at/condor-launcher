@@ -142,7 +142,7 @@ concurrency_limits = _00000000000000000000000000000000
 +IpcExe = "wc_wrapper.sh"
 +IpcExePath = "/usr/local3/bin/wc_tool-1.00"
 should_transfer_files = YES
-transfer_input_files = iplant.cmd,config,job
+transfer_input_files = iplant.cmd,config,job,job-ssl.crt,job-ssl.key
 transfer_output_files = workingvolume/logs/logs-stdout-output,workingvolume/logs/logs-stderr-output
 when_to_transfer_output = ON_EXIT_OR_EVICT
 notification = NEVER
@@ -179,7 +179,7 @@ concurrency_limits = _00000000000000000000000000000000
 +IpcExe = "wc_wrapper.sh"
 +IpcExePath = "/usr/local3/bin/wc_tool-1.00"
 should_transfer_files = YES
-transfer_input_files = iplant.cmd,config,job
+transfer_input_files = iplant.cmd,config,job,job-ssl.crt,job-ssl.key
 transfer_output_files = workingvolume/logs/logs-stdout-output,workingvolume/logs/logs-stderr-output
 when_to_transfer_output = ON_EXIT_OR_EVICT
 notification = NEVER
@@ -213,7 +213,7 @@ concurrency_limits = _00000000000000000000000000000000
 +IpcExe = "wc_wrapper.sh"
 +IpcExePath = "/usr/local3/bin/wc_tool-1.00"
 should_transfer_files = YES
-transfer_input_files = iplant.cmd,config,job
+transfer_input_files = iplant.cmd,config,job,job-ssl.crt,job-ssl.key
 transfer_output_files = workingvolume/logs/logs-stdout-output,workingvolume/logs/logs-stderr-output
 when_to_transfer_output = ON_EXIT_OR_EVICT
 notification = NEVER
@@ -236,6 +236,10 @@ func (v *VaultTester) ChildToken(numUses int) (string, error) {
 
 func (v *VaultTester) StoreConfig(token, mountPoint, jobID string, config []byte) error {
 	return nil
+}
+
+func (v *VaultTester) GenerateTLS() ([]byte, []byte, error) {
+	return nil, nil, nil
 }
 
 func TestLaunch(t *testing.T) {

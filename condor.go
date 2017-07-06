@@ -154,6 +154,11 @@ func (cl *CondorLauncher) launch(s *model.Job, condorPath, condorConfig string) 
 		return "", err
 	}
 
+	pem, key, err := cl.v.GenerateTLS()
+	if err != nil {
+		return "", err
+	}
+
 	cfgCopy := CopyConfig(cl.cfg)
 	cfgCopy.Set("vault.child_token.token", childToken)
 
@@ -183,6 +188,20 @@ func (cl *CondorLauncher) launch(s *model.Job, condorPath, condorConfig string) 
 			data:        s,
 			skipTmpl:    true,
 			jsonify:     true,
+			permissions: 0644,
+		},
+		{
+			filename:    path.Join(sdir, "job-ssl.crt"),
+			data:        pem,
+			skipTmpl:    true,
+			jsonify:     false,
+			permissions: 0644,
+		},
+		{
+			filename:    path.Join(sdir, "job-ssl.key"),
+			data:        key,
+			skipTmpl:    true,
+			jsonify:     false,
 			permissions: 0644,
 		},
 	}

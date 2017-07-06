@@ -16,6 +16,7 @@ type VaultOperator interface {
 	MountCubbyhole(mountPoint string) error
 	ChildToken(numUses int) (string, error)
 	StoreConfig(token, mountPoint, jobID string, config []byte) error
+	GenerateTLS() ([]byte, []byte, error)
 }
 
 // Vaulter is a type of VaultOperator that can interact with an actual Vault
