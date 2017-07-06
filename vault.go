@@ -1,9 +1,11 @@
 package main
 
 import (
-	"errors"
+	"bytes"
 	"fmt"
 	"net/url"
+
+	"github.com/pkg/errors"
 
 	"github.com/cyverse-de/vaulter"
 	vault "github.com/hashicorp/vault/api"
@@ -19,11 +21,14 @@ type VaultOperator interface {
 // Vaulter is a type of VaultOperator that can interact with an actual Vault
 // service.
 type Vaulter struct {
-	api *vaulter.VaultAPI
+	api           *vaulter.VaultAPI
+	tlsMount      string
+	tlsRole       string
+	tlsCommonName string
 }
 
 // VaultInit initializes a *Vaulter.
-func VaultInit(token, apiurl string) (*Vaulter, error) {
+func VaultInit(token, apiurl, tlsMount, tlsRole, tlsCommonName string) (*Vaulter, error) {
 	urlParts, err := url.Parse(apiurl)
 	if err != nil {
 		return nil, err
@@ -39,7 +44,10 @@ func VaultInit(token, apiurl string) (*Vaulter, error) {
 		return nil, err
 	}
 	return &Vaulter{
-		api: api,
+		api:           api,
+		tlsMount:      tlsMount,
+		tlsRole:       tlsRole,
+		tlsCommonName: tlsCommonName,
 	}, nil
 }
 
@@ -89,4 +97,51 @@ func (v *Vaulter) StoreConfig(token, mountPoint, jobID string, config []byte) er
 	}
 	cubbypath := fmt.Sprintf("%s/%s", mountPoint, jobID)
 	return vaulter.WriteMount(v.api, cubbypath, token, data)
+}
+
+// GenerateTLS will create and return []byte's populated with the contents of
+// a TLS cert/key pair.
+func (v *Vaulter) GenerateTLS() (cert []byte, key []byte, err error) {
+	var (
+		gencert, ca, privatekey, pem []byte
+		ok                           bool
+	)
+
+	ttl := "8760h"
+
+	rolecfg := &vaulter.RoleConfig{
+		KeyBits:      4096,
+		MaxTTL:       ttl,
+		AllowAnyName: true,
+	}
+	if _, err = vaulter.CreateRole(v.api, v.tlsMount, v.tlsRole, rolecfg); err != nil {
+		return nil, nil, errors.Wrapf(err, "error creating role %s", v.tlsRole)
+	}
+
+	certcfg := &vaulter.IssueCertConfig{
+		CommonName: v.tlsCommonName,
+		TTL:        ttl,
+		Format:     "pem",
+	}
+	secret, err := vaulter.IssueCert(v.api, v.tlsMount, v.tlsRole, certcfg)
+	if err != nil {
+		return nil, nil, errors.Wrapf(err, "error issuing cert with role %s", v.tlsRole)
+	}
+
+	if gencert, ok = secret.Data["certificate"].([]byte); !ok {
+		return nil, nil, errors.Wrap(err, "certificate field was missing from the secret")
+	}
+
+	if privatekey, ok = secret.Data["private_key"].([]byte); !ok {
+		return nil, nil, errors.Wrap(err, "private_key field was missing from the secret")
+	}
+
+	if ca, ok = secret.Data["issuing_ca"].([]byte); !ok {
+		return nil, nil, errors.Wrap(err, "issuing_ca field was missing from the secret")
+	}
+
+	nl := []byte("\n")
+	pem = bytes.Join([][]byte{gencert, ca}, nl)
+	pem = append(pem[:], nl[:]...) // make sure there's a trailing newline in the pem
+	return pem, privatekey, nil
 }
