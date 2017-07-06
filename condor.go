@@ -443,7 +443,21 @@ func main() {
 	defer client.Close()
 
 	launcher := New(cfg, client, &osys{}, csPath, crPath)
+
+	launcher.v, err = VaultInit(
+		cfg.GetString("vault.token"),
+		cfg.GetString("vault.url"),
+	)
+	if err != nil {
+		log.Fatalf("%+v\n", err)
+	}
+
+	if err = launcher.v.MountCubbyhole(cfg.GetString("vault.irods.mount_path")); err != nil {
+		log.Fatalf("%+v\n", err)
+	}
+
 	launcher.client.SetupPublishing(exchangeName)
+
 	go launcher.client.Listen()
 
 	condorPath := cfg.GetString("condor.path_env_var")
@@ -484,18 +498,6 @@ func main() {
 		messaging.LaunchesKey,
 		launcher.handleLaunchRequests(condorPath, condorConfig),
 	)
-
-	launcher.v, err = VaultInit(
-		cfg.GetString("vault.token"),
-		cfg.GetString("vault.url"),
-	)
-	if err != nil {
-		log.Fatalf("%+v\n", err)
-	}
-
-	if err = launcher.v.MountCubbyhole(cfg.GetString("vault.irods.mount_path")); err != nil {
-		log.Fatalf("%+v\n", err)
-	}
 
 	spin := make(chan int)
 	<-spin
