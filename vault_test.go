@@ -3,7 +3,7 @@ package main
 import "testing"
 
 func TestVaultInit(t *testing.T) {
-	v, err := VaultInit("test", "https://test.test1.test2:8200")
+	v, err := VaultInit("test", "https://test.test1.test2:8200", "", "", "")
 	if err != nil {
 		t.Error(err)
 	}
@@ -20,7 +20,7 @@ func TestVaultInit(t *testing.T) {
 		t.Errorf("token was '%s' instead of '%s'", actual, expected)
 	}
 
-	v, err = VaultInit("test", "asdfasdf")
+	v, err = VaultInit("test", "asdfasdf", "", "", "")
 	if err == nil {
 		t.Error("No url parse error")
 	}
