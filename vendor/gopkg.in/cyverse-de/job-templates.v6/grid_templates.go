@@ -31,7 +31,7 @@ grid_resource = condor SAURON1.pers.ad.uni-graz.at SAURON1.pers.ad.uni-graz.at
 executable = /software/cyverse/entrypoint
 transfer_executable = False
 
-+remote_BatchExtraSubmitArgs = "#$-l h_vmem={{ sgeBytes .MemoryRequest .CPURequest 8589934592 }}\n{{- if .CPURequest }}#$-pe smp {{ .CPURequest }}\n{{ end }}{{- if .DiskRequest }}#$-l tmpspace={{ sgeBytes .DiskRequest 0 0 }}\n{{ end }}"
++remote_BatchExtraSubmitArgs = "#$-A {{.Submitter}}\n#$-l h_vmem={{ sgeBytes .MemoryRequest .CPURequest 8589934592 }}\n{{- if .CPURequest }}#$-pe smp {{ .CPURequest }}\n{{ end }}{{- if .DiskRequest }}#$-l tmpspace={{ sgeBytes .DiskRequest 0 0 }}\n{{ end }}"
 
 arguments = --config config --job job
 output = script-output.log
@@ -63,26 +63,6 @@ transfer_output_files = workingvolume/logs/logs-stdout-output,workingvolume/logs
 when_to_transfer_output = ON_EXIT_OR_EVICT
 notification = NEVER
 queue
-`
-
-// JobConfigTemplateText is the text of the template for the HTCondor submission
-// file.
-const gridJobConfigTemplateText = `
-amqp:
-    uri: {{.GetString "amqp.uri"}}
-    exchange:
-        name: {{.GetString "amqp.exchange.name"}}
-        type: {{.GetString "amqp.exchange.type"}}
-irods:
-    base: "{{.GetString "irods.base"}}"
-porklock:
-    image: "{{.GetString "porklock.image"}}"
-    tag: "{{.GetString "porklock.tag"}}"
-condor:
-    filter_files: "{{.GetString "condor.filter_files"}}"
-vault:
-    token: "{{.GetString "vault.child_token.token"}}"
-    url: "{{.GetString "vault.url"}}"
 `
 
 // SGEBytes formats a number of bytes to a condor format (rounding up to the nearest KiB until it's at least 1MiB, then rounding up to the nearest MiB)
@@ -126,7 +106,7 @@ func init() {
 	if err != nil {
 		log.Fatal(errors.Wrap(err, "failed to parse submission template text"))
 	}
-	gridJobConfigTemplate, err = template.New("job_config").Parse(gridJobConfigTemplateText)
+	gridJobConfigTemplate, err = template.New("job_config").Parse(condorJobConfigTemplateText)
 	if err != nil {
 		log.Fatal(errors.Wrap(err, "failed to parse job config template text"))
 	}
