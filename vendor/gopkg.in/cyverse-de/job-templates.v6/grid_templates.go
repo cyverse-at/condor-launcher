@@ -1,6 +1,7 @@
 package jobs
 
 import (
+	"fmt"
 	"log"
 	"text/template"
 
@@ -30,13 +31,7 @@ grid_resource = condor SAURON1.pers.ad.uni-graz.at SAURON1.pers.ad.uni-graz.at
 executable = /software/cyverse/entrypoint
 transfer_executable = False
 
-rank = 100 - TotalLoadAvg
-{{- if .CPURequest }}
-request_cpus = {{ .CPURequest }}{{ end }}
-{{- if .MemoryRequest }}
-request_memory = {{ condorBytes .MemoryRequest }}{{ end }}
-{{- if .DiskRequest }}
-request_disk = {{ condorBytes .DiskRequest }}{{ end }}
++remote_BatchExtraSubmitArgs = "#$-l h_vmem={{ sgeBytes .MemoryRequest .CPURequest 8589934592 }}\n{{- if .CPURequest }}#$-pe smp {{ .CPURequest }}\n{{ end }}{{- if .DiskRequest }}#$-l tmpspace={{ sgeBytes .DiskRequest 0 0 }}\n{{ end }}"
 
 arguments = --config config --job job
 output = script-output.log
@@ -90,11 +85,41 @@ vault:
     url: "{{.GetString "vault.url"}}"
 `
 
+// SGEBytes formats a number of bytes to a condor format (rounding up to the nearest KiB until it's at least 1MiB, then rounding up to the nearest MiB)
+func SGEBytes(bytes int64, cores float32, minimum int64) string {
+	if cores > 1.0 {
+		bytes = bytes / int64(cores)
+	}
+
+	if minimum > 0 && bytes < minimum {
+		bytes = minimum
+	}
+
+	if bytes < bytesPerKiB {
+		return "1K"
+	}
+
+	if bytes < bytesPerMiB {
+		kb := bytes / bytesPerKiB
+		if bytes%bytesPerKiB > 0 {
+			kb = kb + 1
+		}
+		return fmt.Sprintf("%dK", kb)
+	}
+
+	mb := bytes / bytesPerMiB
+	if bytes%bytesPerMiB > 0 {
+		mb = mb + 1
+	}
+
+	return fmt.Sprintf("%dM", mb)
+}
+
 func init() {
 	var err error
 
 	funcMap := template.FuncMap{
-		"condorBytes": CondorBytes,
+		"sgeBytes": SGEBytes,
 	}
 
 	gridSubmissionTemplate, err = template.New("condor_submit").Funcs(funcMap).Parse(gridSubmissionTemplateText)
