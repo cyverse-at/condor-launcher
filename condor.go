@@ -23,6 +23,7 @@ import (
 	"path"
 	"text/template"
 	"time"
+	"strings"
 
 	"github.com/cyverse-de/configurate"
 	"github.com/cyverse-de/logcabin"
@@ -143,6 +144,10 @@ func (cl *CondorLauncher) launch(s *model.Job, condorPath, condorConfig string) 
 		if err != nil {
 			return "", err
 		}
+	}
+
+	if s.ExecutionTarget == "condor" && strings.HasSuffix(s.Email, "@uni-graz.at") {
+		s.ExecutionTarget = "grid"
 	}
 
 	// Create a copy of the configuration to use for job submission
